@@ -5,6 +5,9 @@ namespace AppBundle\Controller;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\Route;
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
 use Symfony\Component\HttpFoundation\Request;
+use GuzzleHttp\Client;
+use AppBundle\Entity\SourceApiX;
+use AppBundle\Entity\SourceApiXCourse;
 
 class DefaultController extends Controller
 {
@@ -19,15 +22,67 @@ class DefaultController extends Controller
         ]);
     }
     
+    private function getSourceCourseListContent($url) {
+        
+        $sourceClient = new Client();
+        
+        $courseListResponse = $sourceClient->get($url);
+
+        $couseListBodyContent = $courseListResponse
+                ->getBody()
+                ->getContents();
+
+        return json_decode($couseListBodyContent, true);
+    }
+    
+    private function getSourceCourseContent($id) {
+        
+        $sourceClient = new Client();
+        
+        $courseResponse = $sourceClient->get('/courses/{id}', [
+            'id' => $id
+        ]);
+
+        $courseBodyContent = $courseResponse
+                ->getBody()
+                ->getContents();
+
+        return json_decode($courseBodyContent, true);
+    }
+
     public function copyApi()
     {
-        // get course id list
+        $sourceApi = new SourceApiX();
         
-        // get course data
+        $courseList = $this->getSourceCourseListContent('/courses');
+
+        do {
+            foreach ($courseList['data'] as $courseId)
+            {
+                $course = $this->getSourceCourseContent($courseId);
+                
+                $sourceApiXCourse = new SourceApiXCourse(
+                    $course['id'],
+                    $course['name'],
+                    $course['grade']
+                );
+                $sourceApi->addCourse($sourceApiXCourse);
+            }
+            $courseList = $this->getSourceCourseListContent($courseList['next']);
+        } while ($courseList['next'] !== '');
         
-        // map source course to destination course
-        
-        // post course list to destination
+        $destinationCourses = $sourceApi->getDestinationCourses();
+        $this->postToDestinationApi(1, $destinationCourses);
+    }
+    
+    private function postToDestinationApi($schoolId, $destinationCourses) {
+        $destinationClient = new Client();
+        $destinationClient->post('/school/{schoolId}/courses', [
+            'schoolId' => $schoolId,
+            'json' => [
+                'courses' => $destinationCourses
+            ]
+        ]);
     }
             
 }

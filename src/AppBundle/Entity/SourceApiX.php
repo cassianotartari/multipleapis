@@ -74,7 +74,7 @@ class SourceApiX implements SourceApiInterface
         return $this;
     }
 
-    public function getDestinationCourses()
+    public function getDestinationCourses(): array
     {
         $destinationCourses = array();
         foreach ($this->courses as $course) {
